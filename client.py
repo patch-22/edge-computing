@@ -1,43 +1,71 @@
-import asyncio
-import os
+# Web streaming example
+# Source code from the official PiCamera package
+# http://picamera.readthedocs.io/en/latest/recipes2.html#web-streaming
 
-import aiohttp
+import io
+import picamera
+import logging
+import socketserver
+from threading import Condition
+from http import server
 
-from capture import CaptureManger
+class StreamingOutput(object):
+    def __init__(self):
+        self.frame = None
+        self.buffer = io.BytesIO()
+        self.condition = Condition()
 
-HOST = os.getenv('HOST', '0.0.0.0')
-PORT = int(os.getenv('PORT', 8080))
+    def write(self, buf):
+        if buf.startswith(b'\xff\xd8'):
+            # New frame, copy the existing buffer's content and notify all
+            # clients it's available
+            self.buffer.truncate()
+            with self.condition:
+                self.frame = self.buffer.getvalue()
+                self.condition.notify_all()
+            self.buffer.seek(0)
+        return self.buffer.write(buf)
 
-URL = f'http://{HOST}:{PORT}/ws'
+class StreamingHandler(server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == '/stream.mjpg':
+            self.send_response(200)
+            self.send_header('Age', 0)
+            self.send_header('Cache-Control', 'no-cache, private')
+            self.send_header('Pragma', 'no-cache')
+            self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=FRAME')
+            self.end_headers()
+            try:
+                while True:
+                    with output.condition:
+                        output.condition.wait()
+                        frame = output.frame
+                    self.wfile.write(b'--FRAME\r\n')
+                    self.send_header('Content-Type', 'image/jpeg')
+                    self.send_header('Content-Length', len(frame))
+                    self.end_headers()
+                    self.wfile.write(frame)
+                    self.wfile.write(b'\r\n')
+            except Exception as e:
+                logging.warning(
+                    'Removed streaming client %s: %s',
+                    self.client_address, str(e))
+        else:
+            self.send_error(404)
+            self.end_headers()
 
-camera = CaptureManger()
-# camerea.encode()
+class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
+    allow_reuse_address = True
+    daemon_threads = True
 
-
-async def main():
-    session = aiohttp.ClientSession()
-    async with session.ws_connect(URL) as ws:
-
-        await prompt_and_send(ws)
-        async for msg in ws:
-            print('Message received from server:', msg)
-            await prompt_and_send(ws)
-
-            if msg.type in (aiohttp.WSMsgType.CLOSED,
-                            aiohttp.WSMsgType.ERROR):
-                break
-
-
-async def prompt_and_send(ws):
-    # new_msg_to_send = input('Type a message to send to the server: ')
-    # if new_msg_to_send == 'exit':
-    #     print('Exiting!')
-    #     raise SystemExit(0)
-    # await ws.send_str(new_msg_to_send)
-    jpeg = camera.encode()
-    await ws.send_bytes(jpeg)
-
-
-print('Type "exit" to quit')
-loop = asyncio.get_event_loop()
-loop.run_until_complete(main())
+with picamera.PiCamera(resolution='640x480', framerate=15) as camera:
+    output = StreamingOutput()
+    #Uncomment the next line to change your Pi's Camera rotation (in degrees)
+    #camera.rotation = 90
+    camera.start_recording(output, format='mjpeg')
+    try:
+        address = ('', 8000)
+        server = StreamingServer(address, StreamingHandler)
+        server.serve_forever()
+    finally:
+        camera.stop_recording()
