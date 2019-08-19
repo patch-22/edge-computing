@@ -28,15 +28,3 @@ class CaptureManger:
         image = self.encoder.encode(frame, quality=self.jpeg_compression)
 
         return image
-
-
-class CompressedCaptureManager(CaptureManger):
-    def __init__(self):
-        super().__init__()
-
-    def get_frame(self):
-        frame = super().get_frame()
-
-        # Perform the compression
-
-        return frame
