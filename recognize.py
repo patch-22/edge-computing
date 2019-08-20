@@ -4,18 +4,18 @@ import numpy as np
 import urllib.request
 
 # Load a sample picture and learn how to recognize it.
-sam_image = face_recognition.load_image_file("sam.jpg")
+sam_image = face_recognition.load_image_file("data/sam.jpg")
 sam_face_encoding = face_recognition.face_encodings(sam_image)[0]
 
 # Load a second sample picture and learn how to recognize it.
-gytis_image = face_recognition.load_image_file("gytis.jpg")
+gytis_image = face_recognition.load_image_file("data/gytis.jpg")
 gytis_face_encoding = face_recognition.face_encodings(gytis_image)[0]
 
 # Load a sample picture and learn how to recognize it.
-adam_image = face_recognition.load_image_file("adam.jpg")
+adam_image = face_recognition.load_image_file("data/adam.jpg")
 adam_face_encoding = face_recognition.face_encodings(adam_image)[0]
 
-colm_image = face_recognition.load_image_file("colm.jpg")
+colm_image = face_recognition.load_image_file("data/colm.jpg")
 colm_face_encoding = face_recognition.face_encodings(colm_image)[0]
 
 # Create arrays of known face encodings and their names
@@ -46,7 +46,9 @@ process_this_frame = True
 #         if cv2.waitKey(1) == 27:
 #             exit(0)
 
-stream = urllib.request.urlopen('http://twinepi.local:8000/stream.mjpg')
+STREAM_URL = 'http://192.168.1.12:8080/video'
+#http://twinepi.local:8000/stream.mjpg
+stream = urllib.request.urlopen(STREAM_URL)
 bytes = bytes()
 
 while True:
