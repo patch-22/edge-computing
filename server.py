@@ -3,11 +3,16 @@ import cv2
 import urllib.request
 import numpy as np
 import uuid
+from threading import Thread
 
 class Recognizer:
     def __init__(self):
         self.encodings = []
         self.names = []
+        
+        # Manage Multithreading
+        self.threads = []
+
 
     def train(self, encoding, name=str(uuid.uuid4())):
         self.encodings.append(encoding)
@@ -25,6 +30,12 @@ class Recognizer:
             encoding = face_recognition.face_encodings(image)[0]
 
             self.train(encoding, names[idx])
+
+    def recognize_threaded(self, frame):
+        process = Thread(target=self.recognize, args=[frame])
+        process.start()
+
+        self.threads.append(process)
 
     def recognize(self, frame):
         face_locations = face_recognition.face_locations(frame)
@@ -46,6 +57,7 @@ class Recognizer:
             
             local_names.append(name)
         
+        print(local_names)
         return face_locations, local_names
 
 
@@ -58,6 +70,7 @@ recognize = Recognizer()
 recognize.load_samples()
 
 process_this_frame = True
+preview = False
 while True:
     bytes += stream.read(1024)
     a = bytes.find(b'\xff\xd8')
@@ -73,34 +86,41 @@ while True:
         # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
         rgb_small_frame = small_frame[:, :, ::-1]
 
-        # Only process every other frame of video to save time
-        if process_this_frame:
-            face_locations, face_names = recognize.recognize(rgb_small_frame)
 
-        process_this_frame = not process_this_frame
+        if preview:
+            # Only process every other frame of video to save time
+            if process_this_frame:
+                face_locations, face_names = recognize.recognize(rgb_small_frame)
+
+            process_this_frame = not process_this_frame
 
 
-        # Display the results
-        for (top, right, bottom, left), name in zip(face_locations, face_names):
-            # Scale back up face locations since the frame we detected in was scaled to 1/4 size
-            top *= 4
-            right *= 4
-            bottom *= 4
-            left *= 4
+            # Display the results
+            for (top, right, bottom, left), name in zip(face_locations, face_names):
+                # Scale back up face locations since the frame we detected in was scaled to 1/4 size
+                top *= 4
+                right *= 4
+                bottom *= 4
+                left *= 4
 
-            # Draw a box around the face
-            cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
+                # Draw a box around the face
+                cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
 
-            # Draw a label with a name below the face
-            cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
-            font = cv2.FONT_HERSHEY_DUPLEX
-            cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
+                # Draw a label with a name below the face
+                cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
+                font = cv2.FONT_HERSHEY_DUPLEX
+                cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
 
-        # Display the resulting image
-        cv2.imshow('Video', frame)
+            # Display the resulting image
+            cv2.imshow('Video', frame)
 
-        # Hit 'q' on the keyboard to quit!
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+            # Hit 'q' on the keyboard to quit!
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        else:
+            if process_this_frame:
+                recognize.recognize_threaded(rgb_small_frame)
+            
+            process_this_frame = not process_this_frame
 
 cv2.destroyAllWindows()
