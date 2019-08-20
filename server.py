@@ -2,13 +2,14 @@ import face_recognition
 import cv2
 import urllib.request
 import numpy as np
+import uuid
 
 class Recognizer:
     def __init__(self):
         self.encodings = []
         self.names = []
 
-    def train(self, encoding, name):
+    def train(self, encoding, name=str(uuid.uuid4())):
         self.encodings.append(encoding)
         self.names.append(name)
 
