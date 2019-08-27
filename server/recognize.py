@@ -11,7 +11,6 @@ class Recognizer:
         # Manage Multithreading
         self.threads = []
 
-
     def train(self, encoding, name=str(uuid.uuid4())):
         self.encodings.append(encoding)
         self.names.append(name)

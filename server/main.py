@@ -61,9 +61,6 @@ while True:
                 recognize.recognize_threaded(rgb_small_frame)
             
         process_this_frame = not process_this_frame
-            
-        
-
 
 cap.release()
 # out.release()
